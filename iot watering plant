@@ -1,0 +1,89 @@
+// Include necessary libraries for LCD, WiFi, and Blynk
+#include <LiquidCrystal_I2C.h>
+#include <Wire.h>
+#include <WiFiClient.h>
+#include <BlynkSimpleEsp32.h>
+
+// Define pin numbers for the sensor and relay
+#define SOIL_SENSOR_PIN 33
+#define RELAY_PIN 4
+
+// Create an instance of the LCD display with I2C address
+LiquidCrystal_I2C lcdDisplay(0x27, 16, 2);
+
+// Create a timer for Blynk
+BlynkTimer blynkTimer;
+
+// Blynk authentication token
+char authToken[] = "*******************";
+
+// WiFi credentials
+char wifiSSID[] = "******************";
+char wifiPassword[] = "**************";
+
+void setup() {
+  // Initialize serial communication for debugging
+  Serial.begin(115200);
+  
+  // Start Blynk connection
+  Blynk.begin(authToken, wifiSSID, wifiPassword, "blynk.cloud", 80);
+  
+  // Initialize the LCD
+  lcdDisplay.init();
+  lcdDisplay.backlight();
+  
+  // Set the relay pin as an output and turn it off initially
+  pinMode(RELAY_PIN, OUTPUT);
+  digitalWrite(RELAY_PIN, HIGH);
+
+  // Display loading message on the LCD
+  lcdDisplay.setCursor(1, 0);
+  lcdDisplay.print("System Loading");
+  for (int i = 0; i <= 15; i++) {
+    lcdDisplay.setCursor(i, 1);
+    lcdDisplay.print(".");
+    delay(200);
+  }
+  lcdDisplay.clear();
+}
+
+// Function to read soil moisture level
+void readSoilMoisture() {
+  int moistureValue = analogRead(SOIL_SENSOR_PIN);
+  moistureValue = map(moistureValue, 0, 4095, 0, 100);
+  moistureValue = (moistureValue - 100) * -1; // Invert the value for better readability
+  
+  // Send moisture value to Blynk app
+  Blynk.virtualWrite(V0, moistureValue);
+  
+  // Print moisture value to the Serial Monitor
+  Serial.println(moistureValue);
+  
+  // Display moisture value on the LCD
+  lcdDisplay.setCursor(0, 0);
+  lcdDisplay.print("Moisture :");
+  lcdDisplay.print(moistureValue);
+  lcdDisplay.print(" ");
+}
+
+// Function to handle Blynk button press
+BLYNK_WRITE(V1) {
+  bool relayState = param.asInt(); // Get the button state from Blynk
+  
+  if (relayState == 1) {
+    digitalWrite(RELAY_PIN, LOW); // Turn on the relay (motor)
+    lcdDisplay.setCursor(0, 1);
+    lcdDisplay.print("Motor is ON ");
+  } else {
+    digitalWrite(RELAY_PIN, HIGH); // Turn off the relay (motor)
+    lcdDisplay.setCursor(0, 1);
+    lcdDisplay.print("Motor is OFF");
+  }
+}
+
+void loop() {
+  readSoilMoisture(); // Continuously read soil moisture
+  Blynk.run(); // Keep Blynk running
+  
+  delay(200); // Short delay for stability
+}
